@@ -86,27 +86,53 @@ int queue_remove (queue_t **queue, queue_t *elem){
   queue_t *aux  = (*queue)->next;
   queue_t *prev = (*queue);
 
-  queue_t *frist_elem = (*queue)
+  queue_t *frist_elem = (*queue);
   queue_t *last_element;
 
-  int size = 1
+  
+  int size = 1;
   while (aux != (*queue)){
     prev = aux;
     aux  = aux->next;
     size = size + 1;
   } 
 
+  last_element = prev;
+
   if (size = 1){
-    elem->prev = NULL
-    elem->next = NULL
+    elem->prev = NULL;
+    elem->next = NULL;
+    return 0;
   }
 
-  if (elem == *(queue))
+  // Remoção de cabeça
+  if (elem == *(queue)){
+    printf("remoção de cabeça \n ");
+    elem->next->prev = elem->prev;
+    last_element->next  = elem->next;
+    elem->prev = NULL;
+    elem->next = NULL;
+    return 0;
+  }
 
-  last_element = 
+  /*
+  //Remoção da cauda 
+  if (elem == last_element){
+    elem->prev->next = elem->next;
+    frist_elem->prev = elem->prev;
+    elem->next = NULL;
+    elem->prev = NULL;
+    return 0;
+  }
 
-
+  // Remoção de elemento no meio da fila
+  elem->prev->next = elem->next;
+  elem->next->prev = elem->prev;  
+  elem->next = NULL;
+  elem->prev = NULL;
   return 0;
+  */
 }
+
 
 
