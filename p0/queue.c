@@ -29,6 +29,17 @@ int queue_size(queue_t *queue){
 // void print_elem (void *ptr) ; // ptr aponta para o elemento a imprimir
 
 void queue_print (char *name, queue_t *queue, void print_elem (void*) ){
+
+  if (!queue){
+    print_elem(queue);
+  }
+  
+  queue_t *aux = queue;
+
+  while(aux != queue){
+    print_elem(aux);
+    aux = aux->next;
+  }
   return;
 }
 
@@ -41,6 +52,11 @@ void queue_print (char *name, queue_t *queue, void print_elem (void*) ){
 // Retorno: 0 se sucesso, <0 se ocorreu algum erro
 
 int queue_append (queue_t **queue, queue_t *elem){
+
+  if (elem->next != NULL || elem->prev != NULL){
+    return -1;
+  }
+
   if (!(*queue)){
     elem->next = elem;
     elem->prev = elem;
@@ -79,10 +95,11 @@ int queue_append (queue_t **queue, queue_t *elem){
 
 int queue_remove (queue_t **queue, queue_t *elem){
 
-  if (!*(queue)){
-    return -1;
+  if (queue == NULL || *queue == NULL || elem == NULL)
+  {
+      return -1;
   }
- 
+   
   queue_t *aux  = (*queue)->next;
   queue_t *prev = (*queue);
 
@@ -91,17 +108,28 @@ int queue_remove (queue_t **queue, queue_t *elem){
 
   
   int size = 1;
+  int found_element = 0;
+
+  // Testa caso de elemento unico
+  if (elem == prev) { found_element = 1; }
+
   while (aux != (*queue)){
-    prev = aux;
-    aux  = aux->next;
     size = size + 1;
+    if (elem == aux){
+      found_element = 1;
+    }
+    prev = aux;
+    aux  = aux->next; 
   } 
 
-  last_element = prev;
+  if (found_element == 0){
+    return -1;
+  }
 
-  if (size = 1){
+  if (size == 1){
     elem->prev = NULL;
     elem->next = NULL;
+    (*queue) = NULL;
     return 0;
   }
 
@@ -109,17 +137,20 @@ int queue_remove (queue_t **queue, queue_t *elem){
   if (elem == *(queue)){
     printf("remoção de cabeça \n ");
     elem->next->prev = elem->prev;
-    last_element->next  = elem->next;
+    // altered 
+    elem->prev->next  = elem->next;
+    (*queue) = elem->next;
     elem->prev = NULL;
     elem->next = NULL;
     return 0;
   }
 
-  /*
+  
   //Remoção da cauda 
-  if (elem == last_element){
+  if (elem == (*queue)->prev){
     elem->prev->next = elem->next;
-    frist_elem->prev = elem->prev;
+    // altered
+    (*queue)->prev = elem->prev;
     elem->next = NULL;
     elem->prev = NULL;
     return 0;
@@ -131,7 +162,7 @@ int queue_remove (queue_t **queue, queue_t *elem){
   elem->next = NULL;
   elem->prev = NULL;
   return 0;
-  */
+  
 }
 
 
