@@ -73,6 +73,9 @@ int task_init (task_t *task,			    // descritor da nova tarefa
 
     //task_exe = task;
 
+    task->prio_d = 0;
+    task->prio_s = 0;
+
     if (task->id > 1){
         queue_append((queue_t **)&queue_ready, (queue_t*) task);
         task->queue = (queue_t **)&queue_ready;
@@ -142,8 +145,36 @@ void dispatcher_func(void* arg){
 }
 
 task_t* scheduler(){
-    return queue_ready;
+    if (queue_ready == NULL){
+        return NULL;
+    }
+    if (queue_ready->next == queue_ready){
+        return queue_ready;
+    }
+
+    task_t *task_prio = queue_ready;
+    task_prio->prio_d = task_prio->prio_d -1;
+    task_t *task_aux = queue_ready->next;
+    while(task_aux != task_prio){
+        // lowest priority exit first
+
+        if (task_aux->prio_d > -20){
+            task_aux->prio_d = task_aux->prio_d - 1;
+        }
+
+        int lowest_priority = task_prio->prio_d;
+        if (lowest_priority > task_aux->prio_d){
+            task_prio = task_aux;
+            lowest_priority = task_aux->prio_d; 
+        }
+        task_aux = task_aux->next;
+    }
+
+    task_prio->prio_d = task_prio->prio_s;
+
+    return task_prio;
 }
+
 void print_elem (void *ptr)
 {
    task_t *elem = ptr ;
@@ -159,10 +190,36 @@ void print_elem (void *ptr)
 void task_yield(){
     if (task_exe->id > 1 ){
         queue_append((queue_t **) &queue_ready, (queue_t *) task_exe);
-        queue_print("My queue", (queue_t *) queue_ready, print_elem);
+        //queue_print("My queue", (queue_t *) queue_ready, print_elem);
         task_exe->status = READY;
     } 
     task_switch(&dispatcher);
 }
 
+void task_setprio (task_t *task, int prio){
+    if (prio < -20 || prio > 20){
+        return;
+    }
+
+    if (task == NULL){
+        task_exe->prio_d = prio;
+        task_exe->prio_s = prio;
+    }
+
+    else {
+        task->prio_d = prio;
+        task->prio_s = prio;
+    }
+    return; 
+}
+
+int task_getprio (task_t *task){
+
+    if (task == NULL){
+        return task_exe->prio_s;
+    }
+    else {
+        return task->prio_s;
+    }
+}
 

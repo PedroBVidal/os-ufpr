@@ -2,7 +2,6 @@
 #include<stdlib.h>
 #include "queue.h"
 
-
 //------------------------------------------------------------------------------
 // Conta o numero de elementos na fila
 // Retorno: numero de elementos na fila

@@ -17,6 +17,8 @@ typedef struct task_t
   ucontext_t context ;			// contexto armazenado da tarefa
   short status ;			// pronta, rodando, suspensa, ...
   struct queue_t** queue;
+  int prio_s;
+  int prio_d;
   // ... (outros campos serão adicionados mais tarde)
 } task_t ;
 
