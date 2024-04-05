@@ -111,8 +111,8 @@ void task_exit (int exit_code) {
 
 // alterna a execução para a tarefa indicada
 int task_switch (task_t *task) {
-    ucontext_t *new_context = &(task->context);
-    ucontext_t *context = &(task_exe->context);
+    //ucontext_t *new_context = &(task->context);
+    //ucontext_t *context = &(task_exe->context);
 
  
     task_t *prev_task = task_exe;
