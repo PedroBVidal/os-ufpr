@@ -19,6 +19,10 @@ typedef struct task_t
   struct queue_t** queue;
   int prio_s;
   int prio_d;
+  int type;
+  int time_ini;
+  int activations;
+  int processor_time;
   // ... (outros campos serão adicionados mais tarde)
 } task_t ;
 

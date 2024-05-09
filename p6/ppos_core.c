@@ -2,7 +2,10 @@
 #include <stdio.h>
 #include "ppos_data.h"
 #include "ppos.h"
+#include "queue.h"
 #include <ucontext.h>
+#include <signal.h>
+#include <sys/time.h>
 
 task_t main_task;
 task_t *task_exe;
@@ -21,12 +24,29 @@ task_t* scheduler();
 
 struct itimerval timer;
 struct sigaction action;
-
+int quantum;
 #define STACKSIZE 64*1024
+int clock_sys = 0;
+
+unsigned int systime (){
+	return clock_sys;
+}
+
+void tratador_tick(){
+	clock_sys += ITTIMER_U/1000;
+	task_exe->processor_time += ITTIMER_U/1000;
+	if(quantum < 1){
+		task_yield();
+	}
+	else {
+		quantum--;
+	}
+	return;
+}
 
 // Inicializa o sistema operacional; deve ser chamada no inicio do main()
 void ppos_init () {
-	setvbuf (stdout, 0, _IONBF, 0) ;
+    setvbuf (stdout, 0, _IONBF, 0) ;
 
     main_task.next = NULL;
     main_task.prev = NULL;
@@ -38,6 +58,28 @@ void ppos_init () {
     task_exe = &main_task; 
 
     task_init(&dispatcher,(void *)(dispatcher_func),"dispatcher");
+
+    action.sa_handler = tratador_tick ;
+    sigemptyset (&action.sa_mask) ;
+    action.sa_flags = 0 ;
+    if (sigaction (SIGALRM, &action, 0) < 0)
+    {
+    	perror ("Erro em sigaction: ") ;
+    	exit (1) ;
+    }
+
+    // ajusta valores do temporizador
+    timer.it_value.tv_usec = ITTIMER_U ;      // primeiro disparo, em micro-segundos
+    timer.it_value.tv_sec  = 0 ;      // primeiro disparo, em segundos
+    timer.it_interval.tv_usec = ITTIMER_U ;   // disparos subsequentes, em micro-segundos
+    timer.it_interval.tv_sec  = 0 ;   // disparos subsequentes, em segundos
+
+    // arma o temporizador ITIMER_REAL
+    if (setitimer (ITIMER_REAL, &timer, 0) < 0)
+    {
+    	perror ("Erro em setitimer: ") ;
+    	exit (1) ;
+    }
     return;
 
 }
@@ -79,6 +121,8 @@ int task_init (task_t *task,			    // descritor da nova tarefa
 
     task->prio_d = 0;
     task->prio_s = 0;
+    task->time_ini = systime();
+    task->activations = 0;
 
     if (task->id > 1){
         queue_append((queue_t **)&queue_ready, (queue_t*) task);
@@ -103,13 +147,21 @@ void task_exit (int exit_code) {
     #ifdef DEBUG
     printf("Encerrei tarefa %d \n", task_exe->id);
     #endif
+    unsigned int time_fin = systime();
+    int time_spent = time_fin - task_exe->time_ini;
+    int task_id = task_exe->id;
+    int activations = task_exe->activations; 
+    int processor_time = task_exe->processor_time;
+    if (task_id > 0){
+    	printf("Task %d exit: execution time %d ms, processor time %d , %d activations \n", task_exe->id,time_spent,processor_time,activations);
+    }
     if (task_exe != &dispatcher){
         task_switch(&dispatcher);
     }
     else {
         task_switch(&main_task);
     }
-    //task_switch(&main_task);
+ 
     return;
 }
 
@@ -122,6 +174,7 @@ int task_switch (task_t *task) {
     task_t *prev_task = task_exe;
     task_exe = task;
     
+    task->activations += 1;
     if (swapcontext(&(prev_task->context),&(task->context)) < 0){
         task_exe = prev_task;   
         perror("Erro troca de contexto");
@@ -139,6 +192,8 @@ void dispatcher_func(void* arg){
 
         if (next_task != NULL){
             queue_remove((queue_t **) &queue_ready, (queue_t *) next_task);
+
+	    quantum = QUANTUM;
             task_switch(next_task);
         }
 
