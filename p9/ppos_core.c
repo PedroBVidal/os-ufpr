@@ -45,10 +45,12 @@ void tratador_tick(){
     	//printf("sleep_tasks_size %d ", sleep_tasks_size);
     	//printf("q size %d \n ", q_size);
 	//printf("task exe id %d \n" , task_exe->id);
+	
+	if (!inter_enabled) return;
 
 	clock_sys += ITTIMER_U/1000;
 	task_exe->processor_time += ITTIMER_U/1000;
-	if(quantum < 1){
+	if (quantum < 1 && task_exe->id != 1){
 		task_yield();
 	}
 	else {
@@ -269,7 +271,7 @@ void dispatcher_func(void* arg){
     printf("sleep_tasks_size %d ", sleep_tasks_size);
     printf("q size %d \n ", q_size);
     while (q_size != 0 || sleep_tasks_size != 0){
-	//helper_suspended();
+	helper_suspended();
 	
         task_t *next_task = scheduler();
 
@@ -400,11 +402,11 @@ int task_wait(task_t *task){
 
     int s = queue_size((queue_t *) queue_ready);
 
-    //if (s > 0){
+    if (s > 0){
 	    task_suspend (&(task->tasks_waiting));
 	    task->cont_waiting_join++;
-    //}
-//	task_yield();
+    }
+	task_yield();
 
 	return task->id;	
     
@@ -412,8 +414,8 @@ int task_wait(task_t *task){
 }
 
 void task_sleep (int time){
+
 	
-	/*
 	inter_enabled = 0;
 	if (time <= 0){
 		inter_enabled = 1;
@@ -427,6 +429,5 @@ void task_sleep (int time){
 
 	inter_enabled = 1;
 	task_yield();
-	*/
-
+	
 }

@@ -11,15 +11,12 @@ task_t main_task;
 task_t *task_exe;
 task_t dispatcher;
 task_t *queue_ready;
-task_t *queue_suspend;
-task_t *sleep_tasks;
 
 #define READY 0
 #define RUNNING 1
 #define SUSPENDED 1
 #define QUANTUM 20
 #define ITTIMER_U 1000
-
 
 long nextId = 0;
 void dispatcher_func(void* arg); 
@@ -30,22 +27,12 @@ struct sigaction action;
 int quantum;
 #define STACKSIZE 64*1024
 int clock_sys = 0;
-int inter_enabled = 1;
-
 
 unsigned int systime (){
 	return clock_sys;
 }
 
 void tratador_tick(){
-	//printf("TRATADOR TICKS \n");
-    	int q_size = queue_size( (queue_t*) queue_ready);
-    	int sleep_tasks_size = queue_size ((queue_t*) sleep_tasks);
-
-    	//printf("sleep_tasks_size %d ", sleep_tasks_size);
-    	//printf("q size %d \n ", q_size);
-	//printf("task exe id %d \n" , task_exe->id);
-
 	clock_sys += ITTIMER_U/1000;
 	task_exe->processor_time += ITTIMER_U/1000;
 	if(quantum < 1){
@@ -61,31 +48,28 @@ void tratador_tick(){
 void ppos_init () {
     setvbuf (stdout, 0, _IONBF, 0) ;
 	
-//main_task = malloc(sizeof(task_t));
-   // task_init(&main_task,NULL,0);
-
-
+/*
+    // Inicializa atributos de main
     main_task.next = NULL;
     main_task.prev = NULL;
 
     main_task.id = 0;
-    main_task.tasks_waiting = NULL;
     main_task.status = READY;
-    main_task.cont_waiting_join = 0;
 
-      
+
     main_task.time_ini = systime();
     main_task.activations = 0;
     main_task.prio_s = 0;
     main_task.prio_d = 0;
-  
+
     queue_append((queue_t**)&queue_ready, (queue_t*)&main_task);
     main_task.queue = (queue_t**) &queue_ready;
 
     nextId = 1;
+    */
+    task_init(&main_task,NULL,0);
 
     task_exe = &main_task; 
-
 
     task_init(&dispatcher,(void *)(dispatcher_func),"dispatcher");
 
@@ -148,13 +132,11 @@ int task_init (task_t *task,			    // descritor da nova tarefa
     makecontext(context, (void(*)(void)) start_func, 1, arg);
 
     //task_exe = task;
-    task->status = READY;
+
     task->prio_d = 0;
     task->prio_s = 0;
     task->time_ini = systime();
     task->activations = 0;
-    task->tasks_waiting = NULL;
-    task->cont_waiting_join = 0;
 
     if (task->id > 1){
         queue_append((queue_t **)&queue_ready, (queue_t*) task);
@@ -184,20 +166,6 @@ void task_exit (int exit_code) {
     int task_id = task_exe->id;
     int activations = task_exe->activations; 
     int processor_time = task_exe->processor_time;
-
-    task_t *aux = task_exe->tasks_waiting;
-    printf("cont waiting join task_exe %d \n ", task_exe->cont_waiting_join); 
-    for (int i = 0; i < task_exe->cont_waiting_join; i++){
-        queue_remove((queue_t **) &(task_exe->tasks_waiting), (queue_t *) aux);
-        aux->status = READY;
-        printf("putting task %d again to the queue ready \n", aux->id);
-        queue_append((queue_t **) &queue_ready, (queue_t *) aux);
-	// Next task that it's waiting for join 
-	aux = task_exe->tasks_waiting;
-    }
-
-    int sleep_tasks_size = queue_size ((queue_t*) sleep_tasks);
-
     if (task_id >= 0){
     	printf("Task %d exit: execution time %d ms, processor time %d , %d activations \n", task_exe->id,time_spent,processor_time,activations);
     }
@@ -229,48 +197,11 @@ int task_switch (task_t *task) {
 
     return 0; 
 }
-void helper_suspended(){
-	//printf("entering in handle .suspended \n ");
-	if (!sleep_tasks){
-		return;
-	}
-
-	inter_enabled = 0;
-
-	task_t *aux = sleep_tasks;
-	int s = queue_size((queue_t *) sleep_tasks);
-
-	for (int i = 0; i < s; i++){
-        int q_size = queue_size( (queue_t*) queue_ready);
-		if (aux->wake_at <= systime()){
-			queue_remove ((queue_t **) &sleep_tasks, (queue_t *) aux);
-			queue_append ((queue_t **) &queue_ready, (queue_t *) aux);
-			if (!sleep_tasks){
-				inter_enabled = 1;
-				return;
-			}
-
-			aux = sleep_tasks;
-		}
-		aux = aux->next;
-	}
-
-	inter_enabled = 1;
-    int sleep_tasks_size = queue_size ((queue_t*) sleep_tasks);
-
-    //printf("sleep_tasks_size %d \n", sleep_tasks_size);
-
-}
 
 void dispatcher_func(void* arg){
     int q_size = queue_size( (queue_t*) queue_ready);
-    int sleep_tasks_size = queue_size ((queue_t*) sleep_tasks);
 
-    printf("sleep_tasks_size %d ", sleep_tasks_size);
-    printf("q size %d \n ", q_size);
-    while (q_size != 0 || sleep_tasks_size != 0){
-	//helper_suspended();
-	
+    while (q_size != 0){
         task_t *next_task = scheduler();
 
         if (next_task != NULL){
@@ -281,10 +212,7 @@ void dispatcher_func(void* arg){
         }
 
         q_size = queue_size((queue_t*) queue_ready); 
-        sleep_tasks_size = queue_size ((queue_t*) sleep_tasks);
-
     }
-    //printf("condition brokeddddddddddddddddddddddddddddddddd %d %d\n", q_size, sleep_tasks_size);
     task_exit(0);
     return;
 }
@@ -316,7 +244,7 @@ task_t* scheduler(){
     }
 
     task_prio->prio_d = task_prio->prio_s;
-    
+
     return task_prio;
 }
 
@@ -333,7 +261,7 @@ void print_elem (void *ptr)
 }
 
 void task_yield(){
-    if (task_exe->id >= 0 && task_exe->status != SUSPENDED){
+    if (task_exe->id >= 0 ){
         queue_append((queue_t **) &queue_ready, (queue_t *) task_exe);
         //queue_print("My queue", (queue_t *) queue_ready, print_elem);
         task_exe->status = READY;
@@ -368,65 +296,3 @@ int task_getprio (task_t *task){
     }
 }
 
-void task_suspend (task_t **queue){
-
-	// Remove task_exe of the ready queue 
-	int result = queue_remove((queue_t **) &queue_ready, (queue_t *) task_exe);
-	
-	if (queue != NULL){
-            
-			task_exe->status = SUSPENDED;
-			queue_append((queue_t **) queue, (queue_t*) task_exe);
-            printf("suspendig task id = %d \n ", task_exe->id);
-            //printf("queue ready size : %d \n ", s);
-	}
-}
-
-void task_awake (task_t *task, task_t **queue){
-	// remove da lista de suspensas
-	if (queue != NULL){
-		int result = queue_remove((queue_t **) queue, (queue_t *) task);
-	}
-	task->status = READY;
-	// Muda status para pronto e insere na fila de prontos
-	if (queue != NULL){
-		queue_append((queue_t **) &queue_ready, (queue_t*) task);
-	}
-}
-
-int task_wait(task_t *task){
-    
-	// Suspende tarefa atual e a insere na lista de espera de task	
-
-    int s = queue_size((queue_t *) queue_ready);
-
-    //if (s > 0){
-	    task_suspend (&(task->tasks_waiting));
-	    task->cont_waiting_join++;
-    //}
-//	task_yield();
-
-	return task->id;	
-    
-    
-}
-
-void task_sleep (int time){
-	
-	/*
-	inter_enabled = 0;
-	if (time <= 0){
-		inter_enabled = 1;
-		return;
-	}
-
-	task_exe->wake_at = systime()+time;
-
-	queue_remove((queue_t **) &queue_ready, (queue_t *) task_exe);
-	queue_append((queue_t **) &sleep_tasks, (queue_t *) task_exe);
-
-	inter_enabled = 1;
-	task_yield();
-	*/
-
-}

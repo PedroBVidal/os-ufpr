@@ -39,10 +39,10 @@ int main (int argc, char *argv[])
    printf ("main: inicio\n");
 
    ppos_init () ;
-	
+
    task_init (&Pang, Body, "    Pang") ;
    task_setprio (&Pang, 0);
-	
+
    task_init (&Peng, Body, "        Peng") ;
    task_setprio (&Peng, -2);
 
@@ -54,7 +54,7 @@ int main (int argc, char *argv[])
 
    task_init (&Pung, Body, "                    Pung") ;
    task_setprio (&Pung, -8);
-	
+
    printf ("main: fim\n");
    task_exit (0);
 }

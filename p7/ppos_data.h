@@ -23,9 +23,6 @@ typedef struct task_t
   int time_ini;
   int activations;
   int processor_time;
-  struct task_t *tasks_waiting;
-  int cont_waiting_join;
-  int exit_code;
   // ... (outros campos serão adicionados mais tarde)
 } task_t ;
 

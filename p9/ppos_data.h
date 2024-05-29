@@ -26,6 +26,7 @@ typedef struct task_t
   struct task_t *tasks_waiting;
   int cont_waiting_join;
   int exit_code;
+  int wake_at;
   // ... (outros campos serão adicionados mais tarde)
 } task_t ;
 

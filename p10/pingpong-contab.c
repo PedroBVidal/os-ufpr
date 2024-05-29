@@ -2,7 +2,7 @@
 // Prof. Carlos A. Maziero, DINF UFPR
 // Versão 1.5 -- Março de 2023
 
-// Teste da contabilização - tarefas com prioridades distintas
+// Teste da contabilização - tarefas de mesma prioridade
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,8 +27,7 @@ int hardwork (int n)
 // corpo das threads
 void Body (void * arg)
 {
-   printf ("%s: inicio em %4d ms (prio: %d)\n", (char *) arg,
-           systime(), task_getprio(NULL)) ;
+   printf ("%s: inicio em %4d ms\n", (char *) arg, systime()) ;
    hardwork (WORKLOAD) ;
    printf ("%s: fim    em %4d ms\n", (char *) arg, systime()) ;
    task_exit (0) ;
@@ -39,22 +38,13 @@ int main (int argc, char *argv[])
    printf ("main: inicio\n");
 
    ppos_init () ;
-	
+
    task_init (&Pang, Body, "    Pang") ;
-   task_setprio (&Pang, 0);
-	
    task_init (&Peng, Body, "        Peng") ;
-   task_setprio (&Peng, -2);
-
    task_init (&Ping, Body, "            Ping") ;
-   task_setprio (&Ping, -4);
-
    task_init (&Pong, Body, "                Pong") ;
-   task_setprio (&Pong, -6);
-
    task_init (&Pung, Body, "                    Pung") ;
-   task_setprio (&Pung, -8);
-	
+
    printf ("main: fim\n");
    task_exit (0);
 }
