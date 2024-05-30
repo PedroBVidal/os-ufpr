@@ -351,3 +351,27 @@ int task_wait(task_t *task){
 	return task->id;	
 
 }
+
+int sem_init (semaphore_t *s, int value){
+	if (s == NULL){
+		return -1;
+	}
+	s->value = value;	
+	s->queue = NULL;
+	return 0;
+}
+
+int sem_down (semaphore_t *s){
+	
+}
+
+int sem_up (semaphore_t *s){
+	
+}
+
+int sem_destroy (semaphore_t *s) {
+	
+}
+
+
+
