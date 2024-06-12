@@ -54,6 +54,18 @@ typedef struct
 typedef struct
 {
   // preencher quando necessário
+  
+  semaphore_t s_buffer;
+  semaphore_t s_item;
+  semaphore_t s_vaga;
+
+  int count_m;
+  int max_m;
+  int m_size;
+  void *content;
+
+  int active;
+  
 } mqueue_t ;
 
 #endif

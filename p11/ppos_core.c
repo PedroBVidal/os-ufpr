@@ -1,4 +1,4 @@
-#include <stdlib.h>
+#include <stdlib.h> 
 #include <stdio.h>
 #include "ppos_data.h"
 #include "ppos.h"
@@ -32,6 +32,29 @@ int quantum;
 int clock_sys = 0;
 int inter_enabled = 1;
 
+typedef struct filaint_t
+{
+   struct filaint_t *prev ;  // ptr para usar cast com queue_t
+   struct filaint_t *next ;  // ptr para usar cast com queue_t
+   int id ;
+   // outros campos podem ser acrescidos aqui
+} filaint_t ;
+
+// imprime na tela um elemento da fila (chamada pela função queue_print)
+void print_elem (void *ptr)
+{
+	//printf("printing elem \n");
+   filaint_t *elem = ptr ;
+
+   if (!elem){
+	printf("nao elem :( \n");
+      return ;
+   }
+
+   elem->prev ? printf ("%d", elem->prev->id) : printf ("*") ;
+   printf ("<%d>", elem->id) ;
+   elem->next ? printf ("%d", elem->next->id) : printf ("*") ;
+}
 
 unsigned int systime (){
 	return clock_sys;
@@ -80,7 +103,8 @@ void ppos_init () {
     main_task.activations = 0;
     main_task.prio_s = 0;
     main_task.prio_d = 0;
-  
+    main_task.exit_code = -1;
+
     queue_append((queue_t**)&queue_ready, (queue_t*)&main_task);
     main_task.queue = (queue_t**) &queue_ready;
 
@@ -157,6 +181,7 @@ int task_init (task_t *task,			    // descritor da nova tarefa
     task->activations = 0;
     task->tasks_waiting = NULL;
     task->cont_waiting_join = 0;
+    task->exit_code = -1;
 
     if (task->id > 1){
         queue_append((queue_t **)&queue_ready, (queue_t*) task);
@@ -186,6 +211,7 @@ void task_exit (int exit_code) {
     int task_id = task_exe->id;
     int activations = task_exe->activations; 
     int processor_time = task_exe->processor_time;
+    task_exe->exit_code = task_exe->id;
 
     task_t *aux = task_exe->tasks_waiting;
     printf("cont waiting join task_exe %d \n ", task_exe->cont_waiting_join); 
@@ -199,6 +225,10 @@ void task_exit (int exit_code) {
     }
 
     int sleep_tasks_size = queue_size ((queue_t*) sleep_tasks);
+    int queue_ready_size = queue_size ((queue_t*) queue_ready);
+    queue_print("queue after exit ready", (queue_t *) queue_ready,print_elem) ;
+
+    printf("sleep q size %d ready q size %d \n", sleep_tasks_size, queue_ready_size);
 
     if (task_id >= 0){
     	printf("Task %d exit: execution time %d ms, processor time %d , %d activations \n", task_exe->id,time_spent,processor_time,activations);
@@ -286,7 +316,6 @@ void dispatcher_func(void* arg){
         sleep_tasks_size = queue_size ((queue_t*) sleep_tasks);
 
     }
-    //printf("condition brokeddddddddddddddddddddddddddddddddd %d %d\n", q_size, sleep_tasks_size);
     task_exit(0);
     return;
 }
@@ -322,20 +351,8 @@ task_t* scheduler(){
     return task_prio;
 }
 
-void print_elem (void *ptr)
-{
-   task_t *elem = ptr ;
-
-   if (!elem)
-      return ;
-
-   elem->prev ? printf ("%d", elem->prev->id) : printf ("*") ;
-   printf ("<%d>", elem->id) ;
-   elem->next ? printf ("%d", elem->next->id) : printf ("*") ;
-}
-
 void task_yield(){
-    if (task_exe->id >= 0 && task_exe->status != SUSPENDED){
+    if (task_exe->status != SUSPENDED){
         queue_append((queue_t **) &queue_ready, (queue_t *) task_exe);
         //queue_print("My queue", (queue_t *) queue_ready, print_elem);
         task_exe->status = READY;
@@ -373,13 +390,15 @@ int task_getprio (task_t *task){
 void task_suspend (task_t **queue){
 
 	// Remove task_exe of the ready queue 
-	int result = queue_remove((queue_t **) &queue_ready, (queue_t *) task_exe);
 	
 	if (queue != NULL){
-            
+  	    queue_print("queue BEFORE SUSPENSION \n ", (queue_t *) *queue,print_elem) ; 
+			int result = queue_remove((queue_t **) &queue_ready, (queue_t *) task_exe);
 			task_exe->status = SUSPENDED;
 			queue_append((queue_t **) queue, (queue_t*) task_exe);
-            //printf("suspendig task id = %d \n ", task_exe->id);
+            printf("suspendig task id = %d \n ", task_exe->id);
+	    queue_print("queue AFTER SUSPENSION \n ", (queue_t *) *queue,print_elem) ; 
+
             //printf("queue ready size : %d \n ", s);
 	}
 }
@@ -395,14 +414,15 @@ void task_awake (task_t *task, task_t **queue){
 		queue_append((queue_t **) &queue_ready, (queue_t*) task);
 	}
 }
-
 int task_wait(task_t *task){
     
 	// Suspende tarefa atual e a insere na lista de espera de task	
 
     int s = queue_size((queue_t *) queue_ready);
 
-    if (s > 0){
+    if (s > 0 && task->exit_code == -1){
+	    
+	    printf("task that has someone waiting to finish %d \n", task->id);
 	    task_suspend (&(task->tasks_waiting));
 	    task->cont_waiting_join++;
     }
@@ -431,14 +451,18 @@ void task_sleep (int time){
 	task_yield();
 	
 }
-
+/*
 int sem_init (semaphore_t *s, int value){
 	if (s == NULL){
 		return -1;
 	}
+
+	inter_enabled = 0;
 	s->value = value;	
 	s->queue = NULL;
 	s->valid = 1;
+
+	inter_enabled = 1;
 	return 0;
 }
 
@@ -446,10 +470,13 @@ int sem_down (semaphore_t *s){
 	if (s == NULL || !s->valid){
 		return -1;
 	}
+
+	inter_enabled = 0;
 	s->value = s->value - 1;
 	if (s->value < 0){
 		task_suspend(&(s->queue));	
 	}
+	inter_enabled = 1;
 	task_yield();
 
 	if (s->valid){
@@ -466,12 +493,14 @@ int sem_up (semaphore_t *s){
 	if (s == NULL || !s->valid){
 		return -1;
 	}
-	
+		
+	inter_enabled = 0;
 	s->value++;
 	if (s->queue){
 		task_awake ((task_t *) s->queue, (task_t **) &(s->queue));	
 	}
 
+	inter_enabled = 1;
 	return 0;		
 }
 
@@ -479,9 +508,134 @@ int sem_destroy (semaphore_t *s) {
 	if (s == NULL || !s->valid){
 		return -1;
 	}
+
+	inter_enabled = 0;
 	while (s->queue){
 		task_awake ((task_t *) s->queue, (task_t **) &(s->queue));	
 	}
+
 	s->valid = 0;
+	inter_enabled = 1;
 	return 0;
 }
+*/
+
+int sem_init(semaphore_t* s, int value) {
+	
+    if (s == NULL) {
+        return -1;
+    }
+    
+    inter_enabled = 0; // Impede preempção
+    s->queue = NULL;
+    s->value = value;
+    s->active = 1;
+
+#ifdef DEBUG
+    printf("sem_create: criado semaforo com valor inicial %d.\n", value);
+#endif
+
+    inter_enabled = 1; // Retoma preempção
+    if(quantum <= 0) {
+        task_yield();
+    }
+
+    return 0;
+}
+
+int sem_down(semaphore_t* s) {
+    if (s == NULL || !(s->active)) {
+        return -1;
+    }
+
+    inter_enabled = 0; // Impede preempção
+    s->value--;
+    if (s->value < 0) {
+#ifdef DEBUG
+        printf("sem_down: semaforo cheio, suspendendo tarefa %d\n", task_exe->id);
+#endif
+        // Caso não existam mais vagas no semáforo, suspende a tarefa.
+        //task_suspend(&(s->queue));
+	queue_remove((queue_t **) &queue_ready, (queue_t *) task_exe);
+	task_exe->status = SUSPENDED;
+	queue_append((queue_t **) &(s->queue), (queue_t*) task_exe);
+
+        inter_enabled = 1; // Retoma preempção
+        task_yield();
+
+        // Se a tarefa foi acordada devido a um sem_destroy, retorna -1.
+        if (!(s->active)) {
+            return -1;
+        }
+
+#ifdef DEBUG
+        printf("sem_down value < 0: semaforo obtido pela tarefa %d\n", task_exe->id);
+	queue_print("queue ready after suspension ", (queue_t *) queue_ready,print_elem) ;
+
+#endif
+        return 0;
+    }
+
+#ifdef DEBUG
+    printf("sem_down value > 0: semaforo obtido pela tarefa %d\n", task_exe->id);
+    queue_print("queue ready after suspension", (queue_t *) queue_ready,print_elem) ;
+#endif
+
+    inter_enabled = 1; // Retoma preempção
+    if(quantum <= 0) {
+	printf("exiting due to quantum");
+	printf("quantum <=0 \n");
+        task_yield();
+    }
+    return 0;
+}
+
+int sem_up(semaphore_t* s) {
+    if (s == NULL || !(s->active)) {
+        return -1;
+    }
+    
+    inter_enabled = 0; // Impede preempção
+    s->value++;
+    if (s->value <= 0) {
+	//task_resume(s->queue);	
+	#ifdef DEBUG
+	//printf("awaking the task with id %d\n", s->queue->id);
+    	queue_print("queue after awaking ", (queue_t *) s->queue,print_elem) ;
+	queue_print("queue ready after awaking ", (queue_t *) queue_ready,print_elem) ;
+	printf("task exe id %d \n", task_exe->id );
+	#endif
+	task_awake ((task_t *) s->queue, (task_t **) &(s->queue));	
+
+    }
+    inter_enabled = 1; // Retoma preempção
+
+#ifdef DEBUG
+    printf("sem_up: semaforo liberado pela tarefa %d\n", task_exe->id);
+#endif
+    if(quantum <= 0) {
+        task_yield();
+    }
+    return 0;
+}
+
+int sem_destroy(semaphore_t* s) {
+    if (s == NULL || !(s->active)) {
+        return -1;
+    }
+    
+    inter_enabled = 0; // Impede preempção
+    s->active = 0;
+    while (s->queue != NULL) {
+	//task_resume(s->queue);
+	task_awake ((task_t *) s->queue, (task_t **) &(s->queue));	
+
+    }
+
+    inter_enabled = 1; // Retoma preempção
+    if(quantum <= 0) {
+        task_yield();
+    }
+    return 0;
+}
+

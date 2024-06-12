@@ -34,7 +34,7 @@ typedef struct task_t
 typedef struct
 {
 	int value;
-	int valid;
+	int active;
 	struct task_t* queue;
 } semaphore_t ;
 
